@@ -8,8 +8,9 @@ import os
 from app import app
 from flask import render_template, request, redirect, url_for, flash, session, abort
 from werkzeug.utils import secure_filename
-
-
+from forms import UploadForm
+from flask_wtf import FlaskForm
+from flask.helpers import send_from_directory
 ###
 # Routing for your application.
 ###
@@ -25,6 +26,7 @@ def about():
     """Render the website's about page."""
     return render_template('about.html', name="Mary Jane")
 
+app.config['uploads'] = "uploads"
 
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
@@ -32,15 +34,19 @@ def upload():
         abort(401)
 
     # Instantiate your form class
-
+    fileupload = UploadForm()
     # Validate file upload on submit
     if request.method == 'POST':
         # Get file data and save to your uploads folder
-
+        f = fileupload.photo.data
+        filename = secure_filename(f.filename)
+        f.save(os.path.join(
+            app.config['uploads'], filename
+        ))
         flash('File Saved', 'success')
         return redirect(url_for('home'))
 
-    return render_template('upload.html')
+    return render_template('upload.html', form=fileupload)
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -83,6 +89,31 @@ def send_text_file(file_name):
     file_dot_text = file_name + '.txt'
     return app.send_static_file(file_dot_text)
 
+@app.route("/uploads/<filename>")
+def get_image(filename):
+    send_from_directory(app.config['uploads'],
+filename)
+
+@app.route("/files")
+def files():
+    if not session.get('logged_in'):
+        abort(401)
+    return render_template('files.html', ans = get_uploaded_images())
+
+
+path = 'uploads'
+
+folder = os.fsencode(path)
+
+print(folder)
+
+def get_uploaded_images():
+    filenames = []
+    for file in os.listdir(folder):
+        filename = os.fsdecode(file)
+        if filename.endswith( ('.jpeg', '.png', '.jpg') ): 
+            filenames.append(filename)
+            return filenames 
 
 @app.after_request
 def add_header(response):
@@ -99,6 +130,7 @@ def add_header(response):
 def page_not_found(error):
     """Custom 404 page."""
     return render_template('404.html'), 404
+
 
 
 if __name__ == '__main__':
